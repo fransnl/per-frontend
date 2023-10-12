@@ -174,13 +174,15 @@ let desert = '#fadfa5';
 
 function randomSeed(x, y, seed){
 
-    let rx = x/2400 - 0.5;
-    let ry = y/2400 - 0.5;
-
-    let e = Math.round((noise.GetNoise(rx, ry)/2 + 0.5)*12)/12;
-    let m = (noise.GetNoise(rx, ry)/2 + 0.5)
+    let e = (1*noise.GetNoise(x, y)) + (0.5*noise.GetNoise(2*x, 2*y)) + (0.25*noise.GetNoise(4*x, 4*y))
+    e = e/(1+0.5+0.25)
     
-    return noise.GetNoise(x, y)
+    let nx = ((2*x)/2400) - 1
+    let ny = ((2*y)/2400) - 1
+    d = Math.min(1, (Math.pow(nx, 2) + Math.pow(ny, 2))/Math.sqrt(2)) //1 - ((1-Math.pow(nx, 2)) * (1-Math.pow(ny, 2))) //Math.min(1, (Math.pow(x, 2) + Math.pow(y, 2))/Math.sqrt(2))
+    e = (e + (1-d))/2
+    
+    return Math.pow(e, 0.75)
 }
 
 function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
@@ -201,25 +203,17 @@ function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling,
                 img = sprites.water
             } 
             if (groundTile > 0.2){
-                img = sprites.grass
-                yOffset = -10
-            }
-            if(groundTile > 0.5){
-                img = sprites.water
-                yOffset = 0
-            } 
-            if(groundTile > 0.53){
                 img = sprites.sand
                 yOffset = -10
             }
-            if(groundTile > 0.62) img = sprites.dirt
-            if(groundTile > 0.69){
+            if(groundTile > 0.35) img = sprites.dirt
+            if(groundTile > 0.40){
                 yOffset = -20 
                 img = sprites.grass
             }
-            if(groundTile > 0.75) yOffset = -30
-            if(groundTile > 0.80) yOffset = -40
-            if(groundTile > 0.85) yOffset = -50
+            if(groundTile > 0.5) yOffset = -30
+            if(groundTile > 0.6) yOffset = -40
+            if(groundTile > 0.7) yOffset = -50
 
             let xPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
             let yPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
