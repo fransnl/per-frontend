@@ -180,7 +180,7 @@ function randomSeed(x, y, seed){
     let e = Math.round((noise.GetNoise(rx, ry)/2 + 0.5)*12)/12;
     let m = (noise.GetNoise(rx, ry)/2 + 0.5)
     
-    return {e, m}
+    return noise.GetNoise(x, y)
 }
 
 function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
@@ -195,25 +195,31 @@ function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling,
             let x = players[id].x + i
             let y = players[id].y + j
 
-            let groundTile = randomSeed(x, y, seed)
+            let groundTile = Math.abs(randomSeed(x, y, seed))
 
-            if (groundTile.e > 0){
+            if (groundTile > 0){
                 img = sprites.water
             } 
-            if (groundTile.e > 0.2){
+            if (groundTile > 0.2){
                 img = sprites.grass
                 yOffset = -10
-                if(groundTile.m > 0.5) img = sprites.water
-                if(groundTile.m > 0.53) img = sprites.sand
-                if(groundTile.m > 0.56) img = sprites.dirt
-                if(groundTile.m > 0.69){
-                    yOffset = -20 
-                    img = sprites.grass
-                }
-                if(groundTile.m > 0.75) yOffset = -30
-                if(groundTile.m > 0.80) yOffset = -40
-                if(groundTile.m > 0.85) yOffset = -50
             }
+            if(groundTile > 0.5){
+                img = sprites.water
+                yOffset = 0
+            } 
+            if(groundTile > 0.53){
+                img = sprites.sand
+                yOffset = -10
+            }
+            if(groundTile > 0.62) img = sprites.dirt
+            if(groundTile > 0.69){
+                yOffset = -20 
+                img = sprites.grass
+            }
+            if(groundTile > 0.75) yOffset = -30
+            if(groundTile > 0.80) yOffset = -40
+            if(groundTile > 0.85) yOffset = -50
 
             let xPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
             let yPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
