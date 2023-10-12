@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjukt spel</title>
+</head>
+<body id="body">
+    <div id="main">
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+</body>
+<script src="//cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js">
+</script>
+</html>
+
+<style>
+    body{
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: black;
+    }
+
+    #main{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+    }
+</style>
+
+<script>
+
+//#region noise
+const F2 = /*#__PURE__*/ 0.5 * (Math.sqrt(3.0) - 1.0);
+const G2 = /*#__PURE__*/ (3.0 - Math.sqrt(3.0)) / 6.0;
+const F3 = 1.0 / 3.0;
+const G3 = 1.0 / 6.0;
+const F4 = /*#__PURE__*/ (Math.sqrt(5.0) - 1.0) / 4.0;
+const G4 = /*#__PURE__*/ (5.0 - Math.sqrt(5.0)) / 20.0;
+// I'm really not sure why this | 0 (basically a coercion to int)
+// is making this faster but I get ~5 million ops/sec more on the
+// benchmarks across the board or a ~10% speedup.
+const fastFloor = (x) => Math.floor(x) | 0;
+const grad2 = /*#__PURE__*/ new Float64Array([1, 1,
+    -1, 1,
+    1, -1,
+    -1, -1,
+    1, 0,
+    -1, 0,
+    1, 0,
+    -1, 0,
+    0, 1,
+    0, -1,
+    0, 1,
+    0, -1]);
+// double seems to be faster than single or int's
+// probably because most operations are in double precision
+const grad3 = /*#__PURE__*/ new Float64Array([1, 1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    -1, -1, 0,
+    1, 0, 1,
+    -1, 0, 1,
+    1, 0, -1,
+    -1, 0, -1,
+    0, 1, 1,
+    0, -1, 1,
+    0, 1, -1,
+    0, -1, -1]);
+// double is a bit quicker here as well
+const grad4 = /*#__PURE__*/ new Float64Array([0, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1,
+    0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1,
+    1, 0, 1, 1, 1, 0, 1, -1, 1, 0, -1, 1, 1, 0, -1, -1,
+    -1, 0, 1, 1, -1, 0, 1, -1, -1, 0, -1, 1, -1, 0, -1, -1,
+    1, 1, 0, 1, 1, 1, 0, -1, 1, -1, 0, 1, 1, -1, 0, -1,
+    -1, 1, 0, 1, -1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, -1,
+    1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0,
+    -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 0]);
+/**
+ * Creates a 2D noise function
+ * @param random the random function that will be used to build the permutation table
+ * @returns {NoiseFunction2D}
+ */
+
+function createNoise2D(random) {
+    const perm = buildPermutationTable(random);
+    // precalculating this yields a little ~3% performance improvement.
+    const permGrad2x = new Float64Array(perm).map(v => grad2[(v % 12) * 2]);
+    const permGrad2y = new Float64Array(perm).map(v => grad2[(v % 12) * 2 + 1]);
+    return function noise2D(x, y) {
+        // if(!isFinite(x) || !isFinite(y)) return 0;
+        let n0 = 0; // Noise contributions from the three corners
+        let n1 = 0;
+        let n2 = 0;
+        // Skew the input space to determine which simplex cell we're in
+        const s = (x + y) * F2; // Hairy factor for 2D
+        const i = fastFloor(x + s);
+        const j = fastFloor(y + s);
+        const t = (i + j) * G2;
+        const X0 = i - t; // Unskew the cell origin back to (x,y) space
+        const Y0 = j - t;
+        const x0 = x - X0; // The x,y distances from the cell origin
+        const y0 = y - Y0;
+        // For the 2D case, the simplex shape is an equilateral triangle.
+        // Determine which simplex we are in.
+        let i1, j1; // Offsets for second (middle) corner of simplex in (i,j) coords
+        if (x0 > y0) {
+            i1 = 1;
+            j1 = 0;
+        } // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+        else {
+            i1 = 0;
+            j1 = 1;
+        } // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+        // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+        // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+        // c = (3-sqrt(3))/6
+        const x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
+        const y1 = y0 - j1 + G2;
+        const x2 = x0 - 1.0 + 2.0 * G2; // Offsets for last corner in (x,y) unskewed coords
+        const y2 = y0 - 1.0 + 2.0 * G2;
+        // Work out the hashed gradient indices of the three simplex corners
+        const ii = i & 255;
+        const jj = j & 255;
+        // Calculate the contribution from the three corners
+        let t0 = 0.5 - x0 * x0 - y0 * y0;
+        if (t0 >= 0) {
+            const gi0 = ii + perm[jj];
+            const g0x = permGrad2x[gi0];
+            const g0y = permGrad2y[gi0];
+            t0 *= t0;
+            // n0 = t0 * t0 * (grad2[gi0] * x0 + grad2[gi0 + 1] * y0); // (x,y) of grad3 used for 2D gradient
+            n0 = t0 * t0 * (g0x * x0 + g0y * y0);
+        }
+        let t1 = 0.5 - x1 * x1 - y1 * y1;
+        if (t1 >= 0) {
+            const gi1 = ii + i1 + perm[jj + j1];
+            const g1x = permGrad2x[gi1];
+            const g1y = permGrad2y[gi1];
+            t1 *= t1;
+            // n1 = t1 * t1 * (grad2[gi1] * x1 + grad2[gi1 + 1] * y1);
+            n1 = t1 * t1 * (g1x * x1 + g1y * y1);
+        }
+        let t2 = 0.5 - x2 * x2 - y2 * y2;
+        if (t2 >= 0) {
+            const gi2 = ii + 1 + perm[jj + 1];
+            const g2x = permGrad2x[gi2];
+            const g2y = permGrad2y[gi2];
+            t2 *= t2;
+            // n2 = t2 * t2 * (grad2[gi2] * x2 + grad2[gi2 + 1] * y2);
+            n2 = t2 * t2 * (g2x * x2 + g2y * y2);
+        }
+        // Add contributions from each corner to get the final noise value.
+        // The result is scaled to return values in the interval [-1,1].
+        return 70.0 * (n0 + n1 + n2);
+    };
+}
+
+function buildPermutationTable(random) {
+  const tableSize = 512;
+  const p = new Uint8Array(tableSize);
+  for (let i = 0; i < tableSize / 2; i++) {
+    p[i] = i;
+  }
+  for (let i = 0; i < tableSize / 2 - 1; i++) {
+    const r = i + ~~(random.quick() * (256 - i));
+    const aux = p[i];
+    p[i] = p[r];
+    p[r] = aux;
+  }
+  for (let i = 256; i < tableSize; i++) {
+    p[i] = p[i - 256];
+  }
+  return p;
+}
+//#endregion
+
+let players = [];
+
+window.addEventListener("DOMContentLoaded", async () => {
+    //    fluffy-space-succotash-wrxqp54jxxrf5x57-3000.app.github.dev
+    let socket = new WebSocket("wss://sjukt-spel-wow.onrender.com/")
+    //let offline = true;
+    let id = null;
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const scaling = 2
+    const tileSizeX = 23*scaling;
+    const tileSizeY = 21*scaling;
+    const negativeSpeed = 8;
+    const seed = 'hello';
+
+
+    socket.onopen = () => {
+        console.log("connected...")
+        socket.send(JSON.stringify({"case": "init"}))
+    }
+    socket.onclose = event => {
+        console.log("client closed: ", event)
+        console.log("client closed...")
+        socket.send(JSON.stringify({"case": "left", "id": id}))
+    }
+    socket.onerror = error => {
+        console.log("socket error: ", error)
+    }
+    
+    socket.onmessage = event => {
+        let data = JSON.parse(event.data);
+        players = data.players
+
+        if(data.id != undefined && id == null){
+            id = data.id
+        }
+
+        if(data.case != undefined) {
+            if(data.case = "init") { 
+                game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed);
+                console.log(players, id)
+            }
+        }
+    }
+
+    
+    if(windowWidth >= windowHeight){
+        canvas.width = windowWidth 
+        canvas.height = windowHeight
+    } else {
+        canvas.height = windowHeight
+        canvas.width = windowWidth
+    }
+
+    
+    let wX = Math.ceil(canvas.width/64)
+    let wY = Math.ceil(canvas.height/32)
+    
+    let x = 1200
+    let y = 1200
+
+    let sprites = preload()
+
+    document.addEventListener('keydown', (event) => {
+        if(event.key == "a"){
+            let player = JSON.parse(JSON.stringify(players[id]))
+            player.dir = 0
+            player.x -= 1
+            
+            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
+        }
+        
+        if(event.key == "d"){
+            let player = JSON.parse(JSON.stringify(players[id]))
+            player.dir = 1
+            player.x += 1
+            
+            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
+        }
+        if(event.key == "w"){
+            let player = JSON.parse(JSON.stringify(players[id]))
+            player.dir = 2
+            player.y -= 1
+            
+            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
+        }
+        
+        if(event.key == "s"){
+            let player = JSON.parse(JSON.stringify(players[id]))
+            player.dir = 3
+            player.y += 1
+            
+            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
+        }
+        
+    }, false);
+})
+
+function preload() {
+    const grass = new Image();
+    grass.src = './assets/grass.png';
+    const sand = new Image();
+    sand.src = './assets/sand.png';
+    const dirt = new Image();
+    dirt.src = './assets/dirt.png';
+    const water = new Image();
+    water.src = './assets/water.png';
+    const ld = new Image();
+    ld.src = './assets/ld.png';
+    const lu = new Image();
+    lu.src = './assets/lu.png';
+    const rd = new Image();
+    rd.src = './assets/rd.png';
+    const ru = new Image();
+    ru.src = './assets/ru.png';
+
+    return {
+        "grass": grass,
+        "sand": sand,
+        "dirt": dirt,
+        "water": water,
+        "per": {"ld": ld, "lu": lu, "rd": rd, "ru": ru},
+    }
+}
+
+function randomSeed(x, y, seed){
+    let myrng = new Math.seedrandom(seed);
+
+    let noise2D = createNoise2D(myrng)
+    
+    let rx = x/2400 - 0.5;
+    let ry = y/2400 - 0.5;
+    let e = Math.round((noise2D(rx, ry)/2 + 0.5)*12)/12;
+    let m = (noise2D(rx, ry)/2 + 0.5)
+    
+    return {e, m}
+}
+
+function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
+    ctx.fillStyle = "#d4cdcb";
+    ctx.fillRect(0, 0, windowWidth, windowHeight);
+
+    for(let i = -20; i < 20; i++){
+        for(let j = -20; j < 20; j++){
+            let img
+            let yOffset = 0
+
+            let x = players[id].x + i
+            let y = players[id].y + j
+
+            let groundTile = randomSeed(x, y, seed)
+
+            if (groundTile.e > 0){
+                img = sprites.water
+            } 
+            if (groundTile.e > 0.2){
+                img = sprites.grass
+                yOffset = -10
+                if(groundTile.m > 0.5) img = sprites.water
+                if(groundTile.m > 0.53) img = sprites.sand
+                if(groundTile.m > 0.56) img = sprites.dirt
+                if(groundTile.m > 0.69){
+                    yOffset = -20 
+                    img = sprites.grass
+                }
+                if(groundTile.m > 0.75) yOffset = -30
+                if(groundTile.m > 0.80) yOffset = -40
+                if(groundTile.m > 0.85) yOffset = -50
+            }
+
+            let xPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
+            let yPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
+
+            ctx.drawImage(img, xPos, yPos+yOffset, tileSizeX, tileSizeY)
+            
+            for(let p = 0; p < players.length; p++){
+                if(p == id && i == 0 && j == 0){
+                    let perXPos = (0*0.5*tileSizeX)+(0*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
+                    let perYPos = (0*0.25*tileSizeY)+(0*0.25*(tileSizeY))+(windowHeight/2)
+                            
+                    if(players[p].dir == 0){
+                        ctx.drawImage(sprites.per.lu,  perXPos, perYPos+yOffset-84, 46, 84)
+                    } else if (players[p].dir == 1){
+                        ctx.drawImage(sprites.per.rd,  perXPos, perYPos+yOffset-84, 46, 84)
+                    } else if (players[p].dir == 2){
+                        ctx.drawImage(sprites.per.ru,  perXPos, perYPos+yOffset-84, 46, 84)
+                    } else {
+                        ctx.drawImage(sprites.per.ld,  perXPos, perYPos+yOffset-84, 46, 84)
+                    }
+                } else if((players[p].x == players[id].x + i) && (players[p].y == players[id].y + j)) {
+                    let perXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
+                    let perYPos = (i*0.25*tileSizeY)+(j*0.25*(tileSizeY))+(windowHeight/2)
+                    if(players[p].dir == 0){
+                        ctx.drawImage(sprites.per.lu, perXPos, perYPos+yOffset-84, 46, 84)
+                    } else if (players[p].dir == 1){
+                        ctx.drawImage(sprites.per.rd, perXPos, perYPos+yOffset-84, 46, 84)
+                    } else if (players[p].dir == 2){
+                        ctx.drawImage(sprites.per.ru, perXPos, perYPos+yOffset-84, 46, 84)
+                    } else if (players[p].dir == 3){
+                        ctx.drawImage(sprites.per.ld, perXPos, perYPos+yOffset-84, 46, 84)
+                    }
+                }
+            }
+        }
+    }
+
+    setTimeout(() => {
+        requestAnimationFrame(() => { game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) })
+    }, 1000/60)
+}
+
+function Offline() {
+    ctx.fillStyle = "#000000"
+    ctx.fillRect(0, 0, windowHeight, windowWidth); 
+
+    ctx.fillStyle = "#FFFFFF"
+    ctx.font = "120px mainfont"
+    ctx.fillText("Offline", (windowWidth/2)-180, (windowHeight/2)-240);
+}
+	
+</script>
