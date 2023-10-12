@@ -41,7 +41,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     //    fluffy-space-succotash-wrxqp54jxxrf5x57-3000.app.github.dev
     let socket = new WebSocket("wss://sjukt-spel-wow.onrender.com/")
     //let offline = true;
-    let id = 1;
+    let id = null;
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const windowWidth = window.innerWidth;
