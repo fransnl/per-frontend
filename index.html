@@ -144,6 +144,10 @@ function preload() {
     dirt.src = './assets/dirt.png';
     const water = new Image();
     water.src = './assets/water.png';
+    const tree = new Image();
+    tree.src = './assets/tree.png';
+    const bush = new Image();
+    bush.src = './assets/bush.png';
     const ld = new Image();
     ld.src = './assets/ld.png';
     const lu = new Image();
@@ -158,6 +162,8 @@ function preload() {
         "sand": sand,
         "dirt": dirt,
         "water": water,
+	"tree": tree,
+        "bush": bush,
         "per": {"ld": ld, "lu": lu, "rd": rd, "ru": ru},
     }
 }
@@ -183,6 +189,12 @@ function randomSeed(x, y, seed){
     e = (e + (1-d))/2
     
     return Math.pow(e, 0.75)
+}
+
+function trees(x, y){
+    let myrng = new Math.seedrandom("hello" + x + y)
+    
+    return myrng.quick();
 }
 
 function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
@@ -247,6 +259,22 @@ function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling,
                         ctx.drawImage(sprites.per.ld, perXPos, perYPos+yOffset-84, 46, 84)
                     }
                 }
+            }
+
+	if(groundTile > 0.4 && trees(x, y) < 0.005){
+
+                let treeXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
+                let treeYPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
+    
+                ctx.drawImage(sprites.tree, treeXPos, treeYPos+yOffset-167, 100, 167)
+            }
+
+            if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
+
+                let treeXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
+                let treeYPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
+
+                ctx.drawImage(sprites.bush, treeXPos, treeYPos+yOffset-tileSizeY, tileSizeX, tileSizeY)
             }
         }
     }
