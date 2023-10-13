@@ -188,13 +188,20 @@ function randomSeed(x, y, seed){
     d = Math.min(1, (Math.pow(nx, 2) + Math.pow(ny, 2))/Math.sqrt(2)) //1 - ((1-Math.pow(nx, 2)) * (1-Math.pow(ny, 2))) //Math.min(1, (Math.pow(x, 2) + Math.pow(y, 2))/Math.sqrt(2))
     e = (e + (1-d))/2
     
-    return Math.pow(e, 0.75)
+    return Math.pow(e, 1.25)
 }
 
 function trees(x, y){
     let myrng = new Math.seedrandom("hello" + x + y)
     
     return myrng.quick();
+}
+
+function drawPosition(x, y, sizeX, sizeY, windowWidth, windowHeight){
+    let xPos = (x*0.5*sizeX)+(y*(-0.5)*sizeX)+(windowWidth/2)
+    let yPos = (x*0.25*sizeY)+(y*0.25*sizeY)+(windowHeight/2)
+
+    return {xPos, yPos}
 }
 
 function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
@@ -227,54 +234,52 @@ function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling,
             if(groundTile > 0.6) yOffset = -40
             if(groundTile > 0.7) yOffset = -50
 
-            let xPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
-            let yPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
+            let tilePos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
 
-            ctx.drawImage(img, xPos, yPos+yOffset, tileSizeX, tileSizeY)
+            ctx.drawImage(img, tilePos.xPos, tilePos.yPos+yOffset, tileSizeX, tileSizeY)
             
             for(let p = 0; p < players.length; p++){
                 if(p == id && i == 0 && j == 0){
-                    let perXPos = (0*0.5*tileSizeX)+(0*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
-                    let perYPos = (0*0.25*tileSizeY)+(0*0.25*(tileSizeY))+(windowHeight/2)
+
+                    let perPos = drawPosition(0, 0, tileSizeX, tileSizeY, windowWidth, windowHeight)
                             
                     if(players[p].dir == 0){
-                        ctx.drawImage(sprites.per.lu,  perXPos, perYPos+yOffset-84, 46, 84)
-                    } else if (players[p].dir == 1){
-                        ctx.drawImage(sprites.per.rd,  perXPos, perYPos+yOffset-84, 46, 84)
-                    } else if (players[p].dir == 2){
-                        ctx.drawImage(sprites.per.ru,  perXPos, perYPos+yOffset-84, 46, 84)
-                    } else {
-                        ctx.drawImage(sprites.per.ld,  perXPos, perYPos+yOffset-84, 46, 84)
-                    }
-                } else if((players[p].x == players[id].x + i) && (players[p].y == players[id].y + j)) {
-                    let perXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
-                    let perYPos = (i*0.25*tileSizeY)+(j*0.25*(tileSizeY))+(windowHeight/2)
-                    if(players[p].dir == 0){
-                        ctx.drawImage(sprites.per.lu, perXPos, perYPos+yOffset-84, 46, 84)
-                    } else if (players[p].dir == 1){
-                        ctx.drawImage(sprites.per.rd, perXPos, perYPos+yOffset-84, 46, 84)
-                    } else if (players[p].dir == 2){
-                        ctx.drawImage(sprites.per.ru, perXPos, perYPos+yOffset-84, 46, 84)
-                    } else if (players[p].dir == 3){
-                        ctx.drawImage(sprites.per.ld, perXPos, perYPos+yOffset-84, 46, 84)
+                        ctx.drawImage(sprites.per.lu,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else if (players[p].dir == 1){
+                            ctx.drawImage(sprites.per.rd,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else if (players[p].dir == 2){
+                            ctx.drawImage(sprites.per.ru,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else {
+                            ctx.drawImage(sprites.per.ld,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        }
+                    } else if((players[p].x == players[id].x + i) && (players[p].y == players[id].y + j)) {
+
+                        let perPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
+
+                        if(players[p].dir == 0){
+                            ctx.drawImage(sprites.per.lu, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else if (players[p].dir == 1){
+                            ctx.drawImage(sprites.per.rd, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else if (players[p].dir == 2){
+                            ctx.drawImage(sprites.per.ru, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
+                        } else if (players[p].dir == 3){
+                            ctx.drawImage(sprites.per.ld, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
                     }
                 }
             }
 
-	if(groundTile > 0.4 && trees(x, y) < 0.005){
+            if(groundTile > 0.4 && trees(x, y) < 0.005){
 
-                let treeXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
-                let treeYPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
+                let objPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
     
-                ctx.drawImage(sprites.tree, treeXPos, treeYPos+yOffset-167, 100, 167)
+                ctx.drawImage(sprites.tree, objPos.xPos, objPos.yPos+yOffset-167+(tileSizeY/2), 100, 167)
             }
 
             if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
+                
+                let objPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
 
-                let treeXPos = (i*0.5*tileSizeX)+(j*(-0.5)*tileSizeX)-(tileSizeX/2)+(windowWidth/2)
-                let treeYPos = (i*0.25*tileSizeY)+j*0.25*(tileSizeY)+(windowHeight/2)
-
-                ctx.drawImage(sprites.bush, treeXPos, treeYPos+yOffset-tileSizeY, tileSizeX, tileSizeY)
+                ctx.drawImage(sprites.bush, objPos.xPos, objPos.yPos+yOffset-tileSizeY+(tileSizeY/2), tileSizeX, tileSizeY)
             }
         }
     }
