@@ -159,7 +159,7 @@
         let ru = PIXI.Texture.from('./assets/ru.png')
 
         let elapsed = 0.0;
-        app.ticker.maxFPS = 30
+        app.ticker.maxFPS = 60
         app.renderer.background.color = 0xd4cdcb;
         app.renderer.view.style.position = "absolute";
         app.renderer.view.style.display = "block";
@@ -275,30 +275,29 @@
 
                             }
                         }
-    
                         
-                        if(groundTile > 0.4 && trees(x, y) < 0.005){
-                            img = PIXI.Sprite.from(tree)
+                        // if(groundTile > 0.4 && trees(x, y) < 0.005){
+                        //     img = PIXI.Sprite.from(tree)
                             
-                            let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+                        //     let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
     
-                            img.x = objPos.xPos
-                            img.y = objPos.yPos + yOffset - 167 + (tileSizeY/2)
-                            img.width = 100
-                            img.height = 167
-                        }
+                        //     img.x = objPos.xPos
+                        //     img.y = objPos.yPos + yOffset - 167 + (tileSizeY/2)
+                        //     img.width = 100
+                        //     img.height = 167
+                        // }
             
-                        if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
-                            img = PIXI.Sprite.from(bush)
+                        // if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
+                        //     img = PIXI.Sprite.from(bush)
                             
-                            let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+                        //     let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
     
-                            img.x = objPos.xPos
-                            img.y = objPos.yPos + yOffset - tileSizeY + (tileSizeY/2)
-                            img.width = tileSizeX
-                            img.height = tileSizeY
-                        }
-    
+                        //     img.x = objPos.xPos
+                        //     img.y = objPos.yPos + yOffset - tileSizeY + (tileSizeY/2)
+                        //     img.width = tileSizeX
+                        //     img.height = tileSizeY
+                        // }
+                        
                         app.stage.addChild(img)
     
                     }
