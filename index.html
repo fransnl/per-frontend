@@ -4,16 +4,310 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sjukt spel</title>
+    <script src="https://pixijs.download/release/pixi.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+    <script src="./noise.js"></script>
 </head>
-<body id="body">
-    <div id="main">
-        <canvas id="canvas" width="800" height="600"></canvas>
-    </div>
+<body>
+    <script>
+        function convertObjectToBinary(obj){
+            let output = '',
+            input = JSON.stringify(obj) // convert the json to string.
+            // loop over the string and convert each charater to binary string.
+            for (i = 0; i < input.length; i++) {
+                output += input[i].charCodeAt(0).toString(2) + " ";
+            }
+            return output.trimEnd();
+        }
+        function convertBinaryToObject(str) {
+            var newBin = str.split(" ");
+            var binCode = [];
+            for (i = 0; i < newBin.length; i++) {
+                binCode.push(String.fromCharCode(parseInt(newBin[i], 2)));
+            }
+            let jsonString = binCode.join("");
+            return JSON.parse(jsonString)
+        }
+
+        let app = new PIXI.Application({ width: window.innerWidth, height: window.innerHeight });
+        document.body.appendChild(app.view);
+        
+        const scaling = 2
+        const tileSizeX = 23*scaling;
+        const tileSizeY = 21*scaling;
+        wx = 1200
+        wy = 1200
+
+        let players = []
+        let id = null
+        let socket = new WebSocket("wss://sjukt-spel-wow.onrender.com/")
+        const seed = 'hello';
+
+        convertObjectToBinary({"case":"init"})
+
+        socket.onopen = () => {
+            console.log("connected...")
+            socket.send(convertObjectToBinary({"case":"init"}))
+        }
+        socket.onclose = event => {
+            console.log("client closed: ", event)
+            console.log("client closed...")
+            socket.send(convertObjectToBinary({"case": "left", "id": id}))
+        }
+        socket.onerror = error => {
+            console.log("socket error: ", error)
+        }
+        
+        socket.onmessage = event => {
+            let data = convertBinaryToObject(event.data)
+
+            let pdata = []
+
+            data.players.forEach(player => {
+                pdata.push(JSON.parse(JSON.stringify(player)))
+            });
+
+            players = pdata
+
+            if(data.id != undefined && id == null){
+                id = data.id
+            }
+            
+            if(data.case != undefined) {
+                
+                if(data.case = "init") {
+                    console.log(players, id)
+                }
+            }
+        }
+
+        let noise = new FastNoiseLite();
+        noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        noise.SetSeed(seed)
+
+        function randomSeed(x, y){
+            let e = (1*noise.GetNoise(x, y)) + (0.5*noise.GetNoise(2*x, 2*y)) + (0.25*noise.GetNoise(4*x, 4*y))
+            e = e/(1+0.5+0.25)
+            
+            let nx = ((2*x)/2400) - 1
+            let ny = ((2*y)/2400) - 1
+            d = Math.min(1, (Math.pow(nx, 2) + Math.pow(ny, 2))/Math.sqrt(2)) //1 - ((1-Math.pow(nx, 2)) * (1-Math.pow(ny, 2))) //Math.min(1, (Math.pow(x, 2) + Math.pow(y, 2))/Math.sqrt(2))
+            e = (e + (1-d))/2
+            
+            return Math.pow(e, 1.25)
+        }
+
+        function trees(x, y){
+            let myrng = new Math.seedrandom("hello" + x + y)
+            
+            return myrng.quick();
+        }
+
+        function drawPosition(x, y, sizeX, sizeY, windowWidth, windowHeight){
+            let xPos = (x*0.5*sizeX)+(y*(-0.5)*sizeX)+(windowWidth/2)
+            let yPos = (x*0.25*sizeY)+(y*0.25*sizeY)+(windowHeight/2)
+
+            return {xPos, yPos}
+        }
+
+        // document.addEventListener('keydown', (event) => {
+        //     if(event.key == "a"){
+        //         let player = JSON.parse(JSON.stringify(players[id]))
+        //         player.dir = 1
+        //         player.x -= 1
+        //         socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+        //     }
+            
+        //     if(event.key == "d"){
+        //         let player = JSON.parse(JSON.stringify(players[id]))
+        //         player.dir = 1
+        //         player.x += 1
+        //         socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+        //     }
+        //     if(event.key == "w"){
+        //         let player = JSON.parse(JSON.stringify(players[id]))
+        //         player.dir = 2
+        //         player.y -= 1
+        //         socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+        //     }
+            
+        //     if(event.key == "s"){
+        //         let player = JSON.parse(JSON.stringify(players[id]))
+        //         player.dir = 3
+        //         player.y += 1
+        //         socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+        //     }
+        // }, false);
+
+        var keyState = {};    
+        window.addEventListener('keydown',function(e){
+            keyState[e.keyCode || e.which] = true;
+        },true);    
+        window.addEventListener('keyup',function(e){
+            keyState[e.keyCode || e.which] = false;
+        },true);
+
+        let water = PIXI.Texture.from('./assets/water.png')
+        let grass = PIXI.Texture.from('./assets/grass.png')
+        let dirt = PIXI.Texture.from('./assets/dirt.png')
+        let sand = PIXI.Texture.from('./assets/sand.png')
+        let tree = PIXI.Texture.from('./assets/tree.png')
+        let bush = PIXI.Texture.from('./assets/bush.png')
+        let ld = PIXI.Texture.from('./assets/ld.png')
+        let lu = PIXI.Texture.from('./assets/lu.png')
+        let rd = PIXI.Texture.from('./assets/rd.png')
+        let ru = PIXI.Texture.from('./assets/ru.png')
+
+        let elapsed = 0.0;
+        app.ticker.maxFPS = 30
+        app.renderer.background.color = 0xd4cdcb;
+        app.renderer.view.style.position = "absolute";
+        app.renderer.view.style.display = "block";
+        app.renderer.autoDensity = true;
+        app.resizeTo = window;
+
+        let mapobj = new PIXI.Graphics();
+
+        
+        app.ticker.add((delta) => {
+            if(id != null){
+                for (var i = app.stage.children.length - 1; i >= 0; i--) {	app.stage.removeChild(app.stage.children[i]);};
+                
+                if(keyState[65]){
+                    let player = JSON.parse(JSON.stringify(players[id]))
+                    player.dir = 0
+                    player.x -= 1
+                    socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+                }
+                if(keyState[68]){
+                    let player = JSON.parse(JSON.stringify(players[id]))
+                    player.dir = 1
+                    player.x += 1
+                    socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+                }
+                if(keyState[87]){
+                    let player = JSON.parse(JSON.stringify(players[id]))
+                    player.dir = 2
+                    player.y -= 1
+                    socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+                }
+                if(keyState[83]){
+                    let player = JSON.parse(JSON.stringify(players[id]))
+                    player.dir = 3
+                    player.y += 1
+                    socket.send(convertObjectToBinary({"case": "walking", "player": player, "id": id}))
+                }
+    
+                for(let i = -20; i < 21; i++){
+                    for(let j = -20; j < 21; j++){
+                        let yOffset = 0
+                        
+                        let x = players[id].x + i
+                        let y = players[id].y + j
+                        
+                        let groundTile = Math.abs(randomSeed(x, y))
+    
+                        img = PIXI.Sprite.from(water)
+    
+                        if(groundTile > 0.2){
+                            img = PIXI.Sprite.from(sand)
+                            yOffset = -10
+                        }
+                        if(groundTile > 0.35){
+                            img = PIXI.Sprite.from(dirt)
+                        }
+                        if(groundTile > 0.40){
+                            yOffset = -20 
+                            img = PIXI.Sprite.from(grass)
+                        }
+                        if(groundTile > 0.50) yOffset = -30
+                        if(groundTile > 0.60) yOffset = -40
+                        if(groundTile > 0.70) yOffset = -50
+    
+                        let tilePos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+    
+                        img.x = tilePos.xPos
+                        img.y = tilePos.yPos + yOffset
+                        img.width = tileSizeX
+                        img.height = tileSizeY
+    
+                        app.stage.addChild(img)
+
+                        
+                        for(let p = 0; p < players.length; p++){
+                            if(p == id && i == 0 && j == 0){
+                                let perPos = drawPosition(0, 0, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+                                
+                                if(players[p].dir == 0){
+                                    img = PIXI.Sprite.from(lu)
+                                } else if (players[p].dir == 1){
+                                    img = PIXI.Sprite.from(rd)
+                                } else if (players[p].dir == 2){
+                                    img = PIXI.Sprite.from(ru)
+                                } else {
+                                    img = PIXI.Sprite.from(ld)
+                                }
+                                img.x = perPos.xPos
+                                img.y = perPos.yPos + yOffset - 84 + (tileSizeY/2) 
+                                img.width = 46
+                                img.height = 84
+
+                                app.stage.addChild(img)
+                            } else if((players[p].x == players[id].x + i) && (players[p].y == players[id].y + j)) {
+                                let perPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+
+                                if(players[p].dir == 0){
+                                    img = PIXI.Sprite.from(lu)
+                                } else if (players[p].dir == 1){
+                                    img = PIXI.Sprite.from(rd)
+                                } else if (players[p].dir == 2){
+                                    img = PIXI.Sprite.from(ru)
+                                } else {
+                                    img = PIXI.Sprite.from(ld)
+                                }
+
+                                img.x = perPos.xPos
+                                img.y = perPos.yPos + yOffset - 84 + (tileSizeY/2) 
+                                img.width = 46
+                                img.height = 84
+
+                                app.stage.addChild(img)
+
+                            }
+                        }
+    
+                        
+                        if(groundTile > 0.4 && trees(x, y) < 0.005){
+                            img = PIXI.Sprite.from(tree)
+                            
+                            let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+    
+                            img.x = objPos.xPos
+                            img.y = objPos.yPos + yOffset - 167 + (tileSizeY/2)
+                            img.width = 100
+                            img.height = 167
+                        }
+            
+                        if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
+                            img = PIXI.Sprite.from(bush)
+                            
+                            let objPos = drawPosition(i, j, tileSizeX, tileSizeY, window.innerWidth, window.innerHeight)
+    
+                            img.x = objPos.xPos
+                            img.y = objPos.yPos + yOffset - tileSizeY + (tileSizeY/2)
+                            img.width = tileSizeX
+                            img.height = tileSizeY
+                        }
+    
+                        app.stage.addChild(img)
+    
+                    }
+                }
+            }
+        });
+
+    </script>
 </body>
-<script src="//cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js">
-</script>
-<script src="./noise.js">
-</script>
 </html>
 
 <style>
@@ -33,296 +327,3 @@
         height: 100vh;
     }
 </style>
-
-<script>
-let players = [];
-
-window.addEventListener("DOMContentLoaded", async () => {
-    //    fluffy-space-succotash-wrxqp54jxxrf5x57-3000.app.github.dev
-    let socket = new WebSocket("wss://sjukt-spel-wow.onrender.com/")
-    //let offline = true;
-    let id = null;
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    const scaling = 2
-    const tileSizeX = 23*scaling;
-    const tileSizeY = 21*scaling;
-    const negativeSpeed = 8;
-    const seed = 'hello';
-
-
-    socket.onopen = () => {
-        console.log("connected...")
-        socket.send(JSON.stringify({"case": "init"}))
-    }
-    socket.onclose = event => {
-        console.log("client closed: ", event)
-        console.log("client closed...")
-        socket.send(JSON.stringify({"case": "left", "id": id}))
-    }
-    socket.onerror = error => {
-        console.log("socket error: ", error)
-    }
-    
-    socket.onmessage = event => {
-        let data = JSON.parse(event.data);
-        players = data.players
-
-        if(data.id != undefined && id == null){
-            id = data.id
-        }
-
-        if(data.case != undefined) {
-            if(data.case = "init") { 
-                game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed);
-                console.log(players, id)
-            }
-        }
-    }
-
-    
-    if(windowWidth >= windowHeight){
-        canvas.width = windowWidth 
-        canvas.height = windowHeight
-    } else {
-        canvas.height = windowHeight
-        canvas.width = windowWidth
-    }
-
-    
-    let wX = Math.ceil(canvas.width/64)
-    let wY = Math.ceil(canvas.height/32)
-    
-    let x = 1200
-    let y = 1200
-
-    let sprites = preload()
-
-    document.addEventListener('keydown', (event) => {
-        if(event.key == "a"){
-            let player = JSON.parse(JSON.stringify(players[id]))
-            player.dir = 0
-            player.x -= 1
-            
-            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
-        }
-        
-        if(event.key == "d"){
-            let player = JSON.parse(JSON.stringify(players[id]))
-            player.dir = 1
-            player.x += 1
-            
-            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
-        }
-        if(event.key == "w"){
-            let player = JSON.parse(JSON.stringify(players[id]))
-            player.dir = 2
-            player.y -= 1
-            
-            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
-        }
-        
-        if(event.key == "s"){
-            let player = JSON.parse(JSON.stringify(players[id]))
-            player.dir = 3
-            player.y += 1
-            
-            socket.send(JSON.stringify({"case": "walking", "player": player, "id": id}))
-        }
-        
-    }, false);
-})
-
-function preload() {
-    const grass = new Image();
-    grass.src = './assets/grass.png';
-    const sand = new Image();
-    sand.src = './assets/sand.png';
-    const dirt = new Image();
-    dirt.src = './assets/dirt.png';
-    const water = new Image();
-    water.src = './assets/water.png';
-    const tree = new Image();
-    tree.src = './assets/tree.png';
-    const bush = new Image();
-    bush.src = './assets/bush.png';
-    const ld = new Image();
-    ld.src = './assets/ld.png';
-    const lu = new Image();
-    lu.src = './assets/lu.png';
-    const rd = new Image();
-    rd.src = './assets/rd.png';
-    const ru = new Image();
-    ru.src = './assets/ru.png';
-
-    return {
-        "grass": grass,
-        "sand": sand,
-        "dirt": dirt,
-        "water": water,
-	"tree": tree,
-        "bush": bush,
-        "per": {"ld": ld, "lu": lu, "rd": rd, "ru": ru},
-    }
-}
-
-let noise = new FastNoiseLite();
-noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-noise.SetSeed("hello")
-
-let grass = '#81a358';
-let forest = '#476b3f';
-let rock = '#909190';
-let ocean = '#87b5ff';
-let desert = '#fadfa5';
-
-function randomSeed(x, y, seed){
-
-    let e = (1*noise.GetNoise(x, y)) + (0.5*noise.GetNoise(2*x, 2*y)) + (0.25*noise.GetNoise(4*x, 4*y))
-    e = e/(1+0.5+0.25)
-    
-    let nx = ((2*x)/2400) - 1
-    let ny = ((2*y)/2400) - 1
-    d = Math.min(1, (Math.pow(nx, 2) + Math.pow(ny, 2))/Math.sqrt(2)) //1 - ((1-Math.pow(nx, 2)) * (1-Math.pow(ny, 2))) //Math.min(1, (Math.pow(x, 2) + Math.pow(y, 2))/Math.sqrt(2))
-    e = (e + (1-d))/2
-    
-    return Math.pow(e, 1.25)
-}
-
-function trees(x, y){
-    let myrng = new Math.seedrandom("hello" + x + y)
-    
-    return myrng.quick();
-}
-
-function drawPosition(x, y, sizeX, sizeY, windowWidth, windowHeight){
-    let xPos = (x*0.5*sizeX)+(y*(-0.5)*sizeX)+(windowWidth/2)
-    let yPos = (x*0.25*sizeY)+(y*0.25*sizeY)+(windowHeight/2)
-
-    return {xPos, yPos}
-}
-
-function game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) {
-    ctx.fillStyle = "#d4cdcb";
-    ctx.fillRect(0, 0, windowWidth, windowHeight);
-
-    for(let i = -20; i < 21; i++){
-        for(let j = -20; j < 21; j++){
-            let img = sprites.water
-            let yOffset = 0
-
-            let x = players[id].x + i
-            let y = players[id].y + j
-
-            let groundTile = Math.abs(randomSeed(x, y, seed))
-
-            if (groundTile > 0){
-                img = sprites.water
-            } 
-            if (groundTile > 0.2){
-                img = sprites.sand
-                yOffset = -10
-            }
-            if(groundTile > 0.35) img = sprites.dirt
-            if(groundTile > 0.40){
-                yOffset = -20 
-                img = sprites.grass
-            }
-            if(groundTile > 0.5) yOffset = -30
-            if(groundTile > 0.6) yOffset = -40
-            if(groundTile > 0.7) yOffset = -50
-
-            let tilePos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
-
-            ctx.drawImage(img, tilePos.xPos, tilePos.yPos+yOffset, tileSizeX, tileSizeY)
-            
-            for(let p = 0; p < players.length; p++){
-                if(p == id && i == 0 && j == 0){
-
-                    let perPos = drawPosition(0, 0, tileSizeX, tileSizeY, windowWidth, windowHeight)
-                            
-                    if(players[p].dir == 0){
-                        ctx.drawImage(sprites.per.lu,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else if (players[p].dir == 1){
-                            ctx.drawImage(sprites.per.rd,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else if (players[p].dir == 2){
-                            ctx.drawImage(sprites.per.ru,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else {
-                            ctx.drawImage(sprites.per.ld,  perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        }
-                    } else if((players[p].x == players[id].x + i) && (players[p].y == players[id].y + j)) {
-
-                        let perPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
-
-                        if(players[p].dir == 0){
-                            ctx.drawImage(sprites.per.lu, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else if (players[p].dir == 1){
-                            ctx.drawImage(sprites.per.rd, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else if (players[p].dir == 2){
-                            ctx.drawImage(sprites.per.ru, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                        } else if (players[p].dir == 3){
-                            ctx.drawImage(sprites.per.ld, perPos.xPos, perPos.yPos+yOffset-84+(tileSizeY/2), 46, 84)
-                    }
-                }
-            }
-
-            if(groundTile > 0.4 && trees(x, y) < 0.005){
-
-                let objPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
-    
-                ctx.drawImage(sprites.tree, objPos.xPos, objPos.yPos+yOffset-167+(tileSizeY/2), 100, 167)
-            }
-
-            if(groundTile > 0.4 && trees(x, y) > 0.005 && trees(x, y) < 0.01){
-                
-                let objPos = drawPosition(i, j, tileSizeX, tileSizeY, windowWidth, windowHeight)
-
-                ctx.drawImage(sprites.bush, objPos.xPos, objPos.yPos+yOffset-tileSizeY+(tileSizeY/2), tileSizeX, tileSizeY)
-            }
-        }
-    }
-
-    // if(true){
-    //     for(let i = 0; i < 2400; i++){
-    //         for(let j = 0; j < 2400; j++){
-
-    //             let groundTile = randomSeed(i, j, seed)
-                
-    //             if(groundTile.e > 0){
-    //                 ctx.fillStyle = ocean; 
-    //             }
-    //             if(groundTile.e > 0.2){
-    //                 ctx.fillStyle = grass;
-    //                 if(groundTile.m > 0.5) ctx.fillStyle = ocean
-    //                 if(groundTile.m > 0.55) ctx.fillStyle = desert
-    //                 if(groundTile.m > 0.7) ctx.fillStyle = rock
-    //                 if(groundTile.m > 0.75) ctx.fillStyle = grass
-                    
-    //             }
-        
-    //             ctx.fillRect(i*0.25, j*0.25, 1, 1);
-    //         }
-    //     }
-    // }
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "30px Arial";
-    ctx.fillText(`X:${players[id].x} Y:${players[id].y}`, 10, 50);
-
-    setTimeout(() => {
-        requestAnimationFrame(() => { game(id, ctx, windowHeight, windowWidth, tileSizeX, tileSizeY, scaling, wX, wY, sprites, seed) })
-    }, 1000/60)
-}
-
-function Offline() {
-    ctx.fillStyle = "#000000"
-    ctx.fillRect(0, 0, windowHeight, windowWidth); 
-
-    ctx.fillStyle = "#FFFFFF"
-    ctx.font = "120px mainfont"
-    ctx.fillText("Offline", (windowWidth/2)-180, (windowHeight/2)-240);
-}
-	
-</script>
